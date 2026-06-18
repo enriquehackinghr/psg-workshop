@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meridiany – Paper Upload</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f8f7f4; color: #1a1a18; padding: 2rem; max-width: 640px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    .sub { color: #6b6b65; font-size: 0.9rem; margin-bottom: 2rem; }
+    label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 0.35rem; margin-top: 1rem; }
+    input, textarea { width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #e8e6e1; border-radius: 8px; font-size: 0.9rem; font-family: inherit; }
+    input:focus, textarea:focus { outline: none; border-color: #1e4d3a; }
+    button { margin-top: 1.5rem; background: #1e4d3a; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 0.9rem; cursor: pointer; width: 100%; }
+    button:hover { background: #2d6b52; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; font-size: 0.85rem; display: none; }
+    .status.success { display: block; background: #e8f2ed; color: #1e4d3a; }
+    .status.error { display: block; background: #fde8e8; color: #9b1c1c; }
+    .papers { margin-top: 2.5rem; }
+    .papers h2 { font-size: 1.1rem; margin-bottom: 1rem; }
+    .paper-item { background: white; border: 1px solid #e8e6e1; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+    .paper-status { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 100px; background: #e8f2ed; color: #1e4d3a; }
+    .paper-status.error { background: #fde8e8; color: #9b1c1c; }
+    .delete-btn { background: none; border: 1px solid #e8e6e1; color: #9b1c1c; padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.75rem; width: auto; margin: 0; }
+  </style>
+</head>
+<body>
+  <h1>Paper Upload</h1>
+  <p class="sub">Meridiany – internal research ingestion</p>
+
+  <form id="upload-form">
+    <label for="admin-key">Admin API Key</label>
+    <input type="password" id="admin-key" placeholder="Enter admin key" required />
+
+    <label for="title">Paper Title *</label>
+    <input type="text" id="title" required />
+
+    <label for="authors">Authors (comma-separated)</label>
+    <input type="text" id="authors" placeholder="Smith, Jones" />
+
+    <label for="date">Publication Date</label>
+    <input type="date" id="date" />
+
+    <label for="url">Source URL</label>
+    <input type="url" id="url" placeholder="https://..." />
+
+    <label for="pdf">Research file * (PDF, Word, Excel, CSV, Markdown, or text)</label>
+    <input type="file" id="pdf" accept=".pdf,.md,.markdown,.txt,.docx,.csv,.xlsx,.xls" required />
+
+    <button type="submit" id="submit-btn">Upload &amp; Ingest</button>
+  </form>
+
+  <div id="status" class="status"></div>
+
+  <div class="papers">
+    <h2>Papers in Knowledge Base</h2>
+    <div id="paper-list">Loading...</div>
+  </div>
+
+  <script>
+    const apiBase = window.location.origin;
+    const form = document.getElementById('upload-form');
+    const statusEl = document.getElementById('status');
+    const paperList = document.getElementById('paper-list');
+    const submitBtn = document.getElementById('submit-btn');
+
+    const savedKey = sessionStorage.getItem('meridian_admin_key');
+    if (savedKey) document.getElementById('admin-key').value = savedKey;
+
+    async function loadPapers() {
+      const key = document.getElementById('admin-key').value;
+      if (!key) { paperList.textContent = 'Enter admin key to view papers.'; return; }
+
+      try {
+        const res = await fetch(`${apiBase}/api/admin/papers`, {
+          headers: { 'X-Admin-Key': key },
+        });
+        if (!res.ok) throw new Error('Unauthorized');
+        const data = await res.json();
+        if (!data.papers?.length) {
+          paperList.textContent = 'No papers yet.';
+          return;
+        }
+        paperList.innerHTML = data.papers.map(p => `
+          <div class="paper-item">
+            <div>
+              <strong>${p.title}</strong>
+              <span class="paper-status ${p.status === 'error' ? 'error' : ''}">${p.status}</span>
+            </div>
+            <button class="delete-btn" data-id="${p.id}">Delete</button>
+          </div>
+        `).join('');
+
+        paperList.querySelectorAll('.delete-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            if (!confirm('Delete this paper and all its chunks?')) return;
+            await fetch(`${apiBase}/api/admin/papers/${btn.dataset.id}`, {
+              method: 'DELETE',
+              headers: { 'X-Admin-Key': key },
+            });
+            loadPapers();
+          });
+        });
+      } catch {
+        paperList.textContent = 'Could not load papers. Check your admin key.';
+      }
+    }
+
+    document.getElementById('admin-key').addEventListener('change', (e) => {
+      sessionStorage.setItem('meridian_admin_key', e.target.value);
+      loadPapers();
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const key = document.getElementById('admin-key').value;
+      sessionStorage.setItem('meridian_admin_key', key);
+
+      const formData = new FormData();
+      formData.append('pdf', document.getElementById('pdf').files[0]);
+      formData.append('title', document.getElementById('title').value);
+      formData.append('authors', document.getElementById('authors').value);
+      const date = document.getElementById('date').value;
+      if (date) formData.append('publicationDate', date);
+      const url = document.getElementById('url').value;
+      if (url) formData.append('sourceUrl', url);
+
+      submitBtn.disabled = true;
+      statusEl.className = 'status';
+      statusEl.style.display = 'none';
+
+      try {
+        const res = await fetch(`${apiBase}/api/admin/papers/upload`, {
+          method: 'POST',
+          headers: { 'X-Admin-Key': key },
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+        statusEl.textContent = `Success! "${data.title}" ingested with ${data.chunkCount} chunks.`;
+        statusEl.className = 'status success';
+        form.reset();
+        document.getElementById('admin-key').value = key;
+        loadPapers();
+      } catch (err) {
+        statusEl.textContent = err.message;
+        statusEl.className = 'status error';
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    if (savedKey) loadPapers();
+  </script>
+</body>
+</html>

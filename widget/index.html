@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Widget Demo – Meridian Research Assistant</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 2rem; background: #f0f0f0; }
+    h1 { font-size: 1.5rem; }
+    p { color: #555; max-width: 600px; }
+    code { background: #e8e8e8; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>Meridian Widget Demo Page</h1>
+  <p>This page demonstrates the embeddable widget. Click the chat button in the corner to open it.</p>
+  <p>Embed snippet:</p>
+  <pre><code>&lt;script
+  src="https://your-app.onrender.com/widget.js"
+  data-auto-init
+  data-api-url="https://your-app.onrender.com"
+  data-accent-color="#1e4d3a"
+  data-position="bottom-right"
+&gt;&lt;/script&gt;</code></pre>
+
+  <script type="module" src="/src/widget.ts" data-auto-init data-api-url="http://localhost:3001"></script>
+</body>
+</html>
